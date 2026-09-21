@@ -166,7 +166,7 @@ export default function Game() {
     ? Math.round(records.reduce((s, r) => s + r.humanMs, 0) / records.length)
     : 0;
 
-  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel.vercel.app`;
+  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`;
 
   const saveScore = async () => {
     setSaved("pending");
@@ -199,7 +199,7 @@ export default function Game() {
         body: form,
       });
       const imageUrl = await res.text();
-      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel.vercel.app`)}`;
+      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`)}`;
       window.open(tweetUrl, "_blank");
       if (imageUrl.trim()) {
         await navigator.clipboard.writeText(imageUrl.trim());

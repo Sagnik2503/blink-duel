@@ -166,7 +166,7 @@ export default function Game() {
     ? Math.round(records.reduce((s, r) => s + r.humanMs, 0) / records.length)
     : 0;
 
-  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?`;
+  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel.vercel.app`;
 
   const saveScore = async () => {
     setSaved("pending");
@@ -181,16 +181,32 @@ export default function Game() {
     setLeaderboard(d.entries ?? []);
   };
 
-  const downloadScore = async () => {
+  const shareScore = async () => {
     if (!scoreCardRef.current) return;
     const canvas = await html2canvas(scoreCardRef.current, {
       backgroundColor: "#0a0a0f",
       scale: 2,
     });
-    const link = document.createElement("a");
-    link.download = "blink-duel-score.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((b) => resolve(b!), "image/png")
+    );
+    const form = new FormData();
+    form.append("reqtype", "fileupload");
+    form.append("fileToUpload", blob, "blink-duel-score.png");
+    try {
+      const res = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: form,
+      });
+      const imageUrl = await res.text();
+      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel.vercel.app`)}`;
+      window.open(tweetUrl, "_blank");
+      if (imageUrl.trim()) {
+        await navigator.clipboard.writeText(imageUrl.trim());
+      }
+    } catch {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, "_blank");
+    }
   };
 
   // ---------- render ----------
@@ -347,17 +363,8 @@ export default function Game() {
 
       <div className="btnrow" style={{ marginTop: 22 }}>
         <button className="primary" onClick={startGame}>Play again</button>
-        <button onClick={downloadScore}>Download score</button>
-        <a
-          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`}
-          target="_blank"
-          rel="noreferrer"
-          style={{ textDecoration: "none" }}
-        >
-          <button>Share score ↗</button>
-        </a>
-        <button onClick={() => navigator.clipboard.writeText(`${shareText}
-${location.href}`)}>Copy result</button>
+        <button onClick={shareScore}>Share score ↗</button>
+        <button onClick={() => navigator.clipboard.writeText(shareText)}>Copy result</button>
       </div>
 
       {leaderboard && leaderboard.length > 0 && (

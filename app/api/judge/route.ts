@@ -50,14 +50,15 @@ export async function POST(req: Request) {
   const verdict = result.answers.verdict as {
     choice: string;
     probabilities: Record<string, number>;
-    confidence: number;
   };
   const ambiguous = result.answers.ambiguous as { probability: number };
+  const providerMeta = (result as unknown as { providerMetadata?: { typesafe?: { confidence?: Record<string, number> } } }).providerMetadata;
+  const confidence = providerMeta?.typesafe?.confidence?.verdict ?? 0;
 
   return NextResponse.json({
     answer: verdict.choice === "a" ? "a" : "b",
     probabilities: verdict.probabilities,
-    confidence: verdict.confidence,
+    confidence,
     ambiguousProbability: ambiguous.probability,
     serverMs,
     model: (result as unknown as { model?: string }).model ?? "jev-latest",

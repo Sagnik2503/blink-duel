@@ -50,5 +50,5 @@ table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14p
 td, th { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 400; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
 input { font: inherit; background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 12px 14px; border-radius: 10px; }
-.footer-note { color: var(--muted); font-size: 12px; margin-top: 32px; line-height: 1.6; }
+.footer-note { color: var(--muted); font-size: 12px; margin-top: 32px; line-height: 1.6; text-align: center; }
 a { color: var(--accent); }

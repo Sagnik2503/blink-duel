@@ -19,6 +19,9 @@ export default function Home() {
         answered in parallel. Input-only billing, output free — a full 10-round
         game costs a fraction of a cent.
       </p>
+      <p className="footer-note">
+        Built by <a href="https://github.com/Sagnik2503/blink-duel" target="_blank" rel="noreferrer">Sagnik</a>
+      </p>
     </main>
   );
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import html2canvas from "html2canvas";
 import { pickRounds, ROUNDS, type Stimulus } from "@/lib/stimuli";
 
 type JevResult = {
@@ -27,6 +28,9 @@ const CATEGORY_LABEL: Record<Stimulus["category"], string> = {
   sarcasm: "Sarcasm detector",
   urgency: "Triage this",
   word: "Real word?",
+  excuse: "Valid excuse?",
+  fact: "Fact or fiction?",
+  product: "Real product?",
 };
 
 function speedBonus(ms: number) {
@@ -49,6 +53,7 @@ export default function Game() {
   const t0Ref = useRef(0);
   const jevPromiseRef = useRef<Promise<JevResult> | null>(null);
   const rafRef = useRef(0);
+  const scoreCardRef = useRef<HTMLDivElement>(null);
 
   const stimulus = rounds[roundIdx];
 
@@ -161,7 +166,7 @@ export default function Game() {
     ? Math.round(records.reduce((s, r) => s + r.humanMs, 0) / records.length)
     : 0;
 
-  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (${"jv" && "TypeSafe's 150ms AI"}) got ${jevCorrect}/${records.length}. Can you beat it?`;
+  const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?`;
 
   const saveScore = async () => {
     setSaved("pending");
@@ -174,6 +179,18 @@ export default function Game() {
     const r = await fetch("/api/leaderboard");
     const d = await r.json();
     setLeaderboard(d.entries ?? []);
+  };
+
+  const downloadScore = async () => {
+    if (!scoreCardRef.current) return;
+    const canvas = await html2canvas(scoreCardRef.current, {
+      backgroundColor: "#0a0a0f",
+      scale: 2,
+    });
+    const link = document.createElement("a");
+    link.download = "blink-duel-score.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   };
 
   // ---------- render ----------
@@ -280,7 +297,7 @@ export default function Game() {
               </div>
               <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 6 }}>
                 Jev's calibrated probability distribution · confidence{" "}
-                {(rec.jev.confidence * 100).toFixed(0)}%
+                {((rec.jev.confidence ?? 0) * 100).toFixed(0)}%
                 {rec.jev.ambiguousProbability > 0.5 && " · Jev flagged this one as genuinely ambiguous"}
               </div>
             </div>
@@ -306,7 +323,7 @@ export default function Game() {
   // results
   return (
     <div className="panel">
-      <div style={{ textAlign: "center" }}>
+      <div ref={scoreCardRef} style={{ textAlign: "center", background: "var(--bg)", padding: 24, borderRadius: 12 }}>
         <div className="label" style={{ color: "var(--muted)", textTransform: "uppercase", letterSpacing: 2, fontSize: 13 }}>Final score</div>
         <div className="bigscore">{humanScore}</div>
         <div className="scores">
@@ -330,6 +347,7 @@ export default function Game() {
 
       <div className="btnrow" style={{ marginTop: 22 }}>
         <button className="primary" onClick={startGame}>Play again</button>
+        <button onClick={downloadScore}>Download score</button>
         <a
           href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`}
           target="_blank"

@@ -1,7 +1,7 @@
 
 export type Stimulus = {
   id: string;
-  category: "review" | "sarcasm" | "urgency" | "word";
+  category: "review" | "sarcasm" | "urgency" | "word" | "excuse" | "fact" | "product";
   /** What the player sees as the thing to judge */
   text: string;
   /** The question shown to the player */
@@ -345,8 +345,6 @@ export const STIMULI: Stimulus[] = [
     jevInstruction: "Decide whether `content` is an established English word or an invented nonsense word.",
     truth: "b", explanation: "Invented — twindle is a 17th-century coinage for dying embers, but not established; the safe call is made up.",
   },
-
-  { id: "exc1", category: "excuse", text: "Sorry I'm late, my train was delayed and I had to wait for the next one.", prompt: "Real excuse or made up?", optionA: "Real", optionB: "Made up", optionADesc: "A plausible excuse that could genuinely happen.", optionBDesc: "An invented or fabricated excuse.", jevInstruction: "Decide whether this sounds like a genuine real-world excuse or an invented excuse.", truth: "a", explanation: "A routine train delay is a common and believable reason for being late.", },
 ];
 
 export const ROUNDS = 10;

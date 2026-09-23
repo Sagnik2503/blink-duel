@@ -20,7 +20,7 @@ export default function Home() {
         game costs a fraction of a cent.
       </p>
       <p className="footer-note">
-        Built by <a href="https://github.com/Sagnik2503/blink-duel" target="_blank" rel="noreferrer">Sagnik</a>
+        Built by Sagnik
       </p>
     </main>
   );

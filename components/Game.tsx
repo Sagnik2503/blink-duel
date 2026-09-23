@@ -161,23 +161,16 @@ export default function Game() {
   const nextRound = useCallback(() => {
     if (roundIdx + 1 >= rounds.length) {
       setPhase("results");
-      // Auto-save as Anonymous if user hasn't entered a name
-      const name = playerName.trim() || "Anonymous";
-      fetch("/api/leaderboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, score: humanScore, avgMs }),
-      }).then(() => {
-        return fetch("/api/leaderboard");
-      }).then((r) => r.json())
+      fetch("/api/leaderboard")
+        .then((r) => r.json())
         .then((d) => setLeaderboard(d.entries))
-        .catch(() => {});
+        .catch(() => setLeaderboard([]));
     } else {
       setRoundIdx((i) => i + 1);
       setPhase("countdown");
       setCountdown(3);
     }
-  }, [roundIdx, rounds.length, playerName, humanScore, avgMs]);
+  }, [roundIdx, rounds.length]);
 
   const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`;
 
@@ -411,19 +404,17 @@ export default function Game() {
         </>
       )}
 
-      {leaderboard && (
-        <div style={{ marginTop: 22, display: "flex", gap: 10, justifyContent: "center" }}>
-          <input
-            placeholder="Your name (optional)"
-            value={playerName}
-            maxLength={24}
-            onChange={(e) => setPlayerName(e.target.value)}
-          />
-          <button onClick={saveScore} disabled={saved !== "no"}>
-            {saved === "yes" ? "Saved ✓" : saved === "pending" ? "Saving…" : "Save score"}
-          </button>
-        </div>
-      )}
+      <div style={{ marginTop: 22, display: "flex", gap: 10, justifyContent: "center" }}>
+        <input
+          placeholder="Your name (optional)"
+          value={playerName}
+          maxLength={24}
+          onChange={(e) => setPlayerName(e.target.value)}
+        />
+        <button onClick={saveScore} disabled={saved !== "no"}>
+          {saved === "yes" ? "Saved ✓" : saved === "pending" ? "Saving…" : "Save score"}
+        </button>
+      </div>
 
       <table style={{ marginTop: 30 }}>
         <thead><tr><th>Stimulus</th><th>You</th><th>Jev</th></tr></thead>

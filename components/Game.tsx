@@ -34,7 +34,7 @@ const CATEGORY_LABEL: Record<Stimulus["category"], string> = {
 };
 
 function speedBonus(ms: number) {
-  return Math.max(0, Math.round((2500 - ms) / 25)); // 100 pts at <=500ms, decaying to 0 at 2.5s
+  return Math.max(0, Math.round((2500 - ms) / 25));
 }
 
 export default function Game() {
@@ -42,7 +42,7 @@ export default function Game() {
   const [rounds, setRounds] = useState<Stimulus[]>([]);
   const [roundIdx, setRoundIdx] = useState(0);
   const [countdown, setCountdown] = useState(3);
-  const [tick, setTick] = useState(0); // live clock during stimulus
+  const [tick, setTick] = useState(0);
   const [jev, setJev] = useState<JevResult | null>(null);
   const [records, setRecords] = useState<RoundRecord[]>([]);
   const [currentRecord, setCurrentRecord] = useState<RoundRecord | null>(null);
@@ -57,7 +57,14 @@ export default function Game() {
 
   const stimulus = rounds[roundIdx];
 
-  // Live clock animation while the stimulus is up
+  // Fetch leaderboard on mount
+  useEffect(() => {
+    fetch("/api/leaderboard")
+      .then((r) => r.json())
+      .then((d) => setLeaderboard(d.entries))
+      .catch(() => setLeaderboard([]));
+  }, []);
+
   useEffect(() => {
     if (phase !== "stimulus") return;
     const loop = () => {
@@ -79,14 +86,20 @@ export default function Game() {
     setCountdown(3);
   }, []);
 
-  // 3-2-1 countdown then show the stimulus
+  const stopGame = useCallback(() => {
+    setPhase("idle");
+    fetch("/api/leaderboard")
+      .then((r) => r.json())
+      .then((d) => setLeaderboard(d.entries))
+      .catch(() => setLeaderboard([]));
+  }, []);
+
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown === 0) {
       setPhase("stimulus");
       setJev(null);
       t0Ref.current = performance.now();
-      // Fire the Jev request the same instant the stimulus renders.
       const s = rounds[roundIdx];
       jevPromiseRef.current = fetch("/api/judge", {
         method: "POST",
@@ -107,16 +120,13 @@ export default function Game() {
     return () => clearTimeout(t);
   }, [phase, countdown, rounds, roundIdx]);
 
-  // Show Jev's result as soon as it lands while the player is still thinking
   useEffect(() => {
     if (phase !== "stimulus" || !jevPromiseRef.current) return;
     let alive = true;
     jevPromiseRef.current
       .then((r) => alive && setJev(r))
       .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [phase, roundIdx]);
 
   const answer = useCallback(
@@ -125,11 +135,7 @@ export default function Game() {
       const humanMs = Math.round(performance.now() - t0Ref.current);
       let jevResult = jev;
       if (!jevResult && jevPromiseRef.current) {
-        try {
-          jevResult = await jevPromiseRef.current;
-        } catch {
-          return; // failed round — let them retry by reloading; keep it simple
-        }
+        try { jevResult = await jevPromiseRef.current; } catch { return; }
       }
       if (!jevResult) return;
       setJev(jevResult);
@@ -140,20 +146,6 @@ export default function Game() {
     },
     [phase, jev, stimulus],
   );
-
-  const nextRound = useCallback(() => {
-    if (roundIdx + 1 >= rounds.length) {
-      setPhase("results");
-      fetch("/api/leaderboard")
-        .then((r) => r.json())
-        .then((d) => setLeaderboard(d.entries))
-        .catch(() => setLeaderboard([]));
-    } else {
-      setRoundIdx((i) => i + 1);
-      setPhase("countdown");
-      setCountdown(3);
-    }
-  }, [roundIdx, rounds.length]);
 
   // ---------- scoring ----------
   const humanScore = records.reduce((sum, r) => {
@@ -166,14 +158,36 @@ export default function Game() {
     ? Math.round(records.reduce((s, r) => s + r.humanMs, 0) / records.length)
     : 0;
 
+  const nextRound = useCallback(() => {
+    if (roundIdx + 1 >= rounds.length) {
+      setPhase("results");
+      // Auto-save as Anonymous if user hasn't entered a name
+      const name = playerName.trim() || "Anonymous";
+      fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, score: humanScore, avgMs }),
+      }).then(() => {
+        return fetch("/api/leaderboard");
+      }).then((r) => r.json())
+        .then((d) => setLeaderboard(d.entries))
+        .catch(() => {});
+    } else {
+      setRoundIdx((i) => i + 1);
+      setPhase("countdown");
+      setCountdown(3);
+    }
+  }, [roundIdx, rounds.length, playerName, humanScore, avgMs]);
+
   const shareText = `I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`;
 
   const saveScore = async () => {
     setSaved("pending");
+    const name = playerName.trim() || "Anonymous";
     await fetch("/api/leaderboard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: playerName, score: humanScore, avgMs }),
+      body: JSON.stringify({ name, score: humanScore, avgMs }),
     });
     setSaved("yes");
     const r = await fetch("/api/leaderboard");
@@ -199,11 +213,8 @@ export default function Game() {
         body: form,
       });
       const imageUrl = await res.text();
-      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`)}`;
-      window.open(tweetUrl, "_blank");
-      if (imageUrl.trim()) {
-        await navigator.clipboard.writeText(imageUrl.trim());
-      }
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I scored ${humanScore} in Blink Duel — ${humanCorrect}/${records.length} correct at ${avgMs}ms avg. Jev (TypeSafe's 150ms AI) got ${jevCorrect}/${records.length}. Can you beat it?\n\nhttps://blink-duel-swart.vercel.app`)}`, "_blank");
+      if (imageUrl.trim()) await navigator.clipboard.writeText(imageUrl.trim());
     } catch {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, "_blank");
     }
@@ -212,18 +223,36 @@ export default function Game() {
   // ---------- render ----------
   if (phase === "idle") {
     return (
-      <div className="panel">
-        <p style={{ lineHeight: 1.6 }}>
-          <strong>{ROUNDS} rounds.</strong> Each round, a stimulus appears and both
-          you and Jev answer. You earn points for being <em>right</em> and{" "}
-          <em>fast</em>. Jev doesn't get points — Jev just doesn't miss.
-        </p>
-        <div className="btnrow" style={{ marginTop: 24 }}>
-          <button className="primary" onClick={startGame}>
-            Start the duel ⚡
-          </button>
+      <>
+        <div className="panel">
+          <p style={{ lineHeight: 1.6 }}>
+            <strong>{ROUNDS} rounds.</strong> Each round, a stimulus appears and both
+            you and Jev answer. You earn points for being <em>right</em> and{" "}
+            <em>fast</em>. Jev doesn't get points — Jev just doesn't miss.
+          </p>
+          <div className="btnrow" style={{ marginTop: 24 }}>
+            <button className="primary" onClick={startGame}>
+              Start the duel ⚡
+            </button>
+          </div>
         </div>
-      </div>
+
+        {leaderboard && leaderboard.length > 0 && (
+          <div className="panel">
+            <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--muted)", marginBottom: 10 }}>Leaderboard</h3>
+            <table>
+              <thead><tr><th>#</th><th>Name</th><th>Score</th><th>Avg ms</th></tr></thead>
+              <tbody>
+                {leaderboard.map((e, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td><td>{e.name}</td><td>{e.score}</td><td>{e.avgMs}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -235,6 +264,9 @@ export default function Game() {
           <span>{CATEGORY_LABEL[stimulus.category]}</span>
         </div>
         <div className="countdown">{countdown > 0 ? countdown : "GO"}</div>
+        <div className="btnrow" style={{ marginTop: 12 }}>
+          <button onClick={stopGame}>Stop game</button>
+        </div>
       </div>
     );
   }
@@ -243,11 +275,7 @@ export default function Game() {
     const rec = currentRecord;
     const humanRight = rec ? rec.humanAnswer === rec.stimulus.truth : null;
     const jevRight = rec ? rec.jev.answer === rec.stimulus.truth : null;
-    const pts = rec
-      ? humanRight
-        ? 100 + speedBonus(rec.humanMs)
-        : 0
-      : 0;
+    const pts = rec ? (humanRight ? 100 + speedBonus(rec.humanMs) : 0) : 0;
     const pa = rec?.jev.probabilities?.a ?? 0;
     const pb = rec?.jev.probabilities?.b ?? 0;
 
@@ -340,7 +368,7 @@ export default function Game() {
   return (
     <div className="panel">
       <div ref={scoreCardRef} style={{ textAlign: "center", background: "var(--bg)", padding: 24, borderRadius: 12 }}>
-        <div className="label" style={{ color: "var(--muted)", textTransform: "uppercase", letterSpacing: 2, fontSize: 13 }}>Final score</div>
+        <div style={{ color: "var(--muted)", textTransform: "uppercase", letterSpacing: 2, fontSize: 13 }}>Final score</div>
         <div className="bigscore">{humanScore}</div>
         <div className="scores">
           <div>
@@ -362,7 +390,7 @@ export default function Game() {
       </div>
 
       <div className="btnrow" style={{ marginTop: 22 }}>
-        <button className="primary" onClick={startGame}>Play again</button>
+        <button className="primary" onClick={stopGame}>Play again</button>
         <button onClick={shareScore}>Share score ↗</button>
         <button onClick={() => navigator.clipboard.writeText(shareText)}>Copy result</button>
       </div>
@@ -386,12 +414,12 @@ export default function Game() {
       {leaderboard && (
         <div style={{ marginTop: 22, display: "flex", gap: 10, justifyContent: "center" }}>
           <input
-            placeholder="Your name"
+            placeholder="Your name (optional)"
             value={playerName}
             maxLength={24}
             onChange={(e) => setPlayerName(e.target.value)}
           />
-          <button onClick={saveScore} disabled={saved !== "no" || !playerName.trim()}>
+          <button onClick={saveScore} disabled={saved !== "no"}>
             {saved === "yes" ? "Saved ✓" : saved === "pending" ? "Saving…" : "Save score"}
           </button>
         </div>
